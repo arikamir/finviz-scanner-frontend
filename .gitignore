@@ -2,6 +2,14 @@
 # This repo contains the frontend, Docker configs, and deployment scripts
 # The backend Python package has its own separate repository
 
+# Node.js dependencies and build artifacts
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+package-lock.json
+yarn.lock
+
 # Environment files with secrets
 .env
 .env.local
@@ -12,9 +20,6 @@
 # Logs
 logs/
 *.log
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
 
 # Runtime data
 pids

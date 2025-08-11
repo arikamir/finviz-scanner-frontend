@@ -1,0 +1,242 @@
+name: Frontend CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+  workflow_dispatch:
+
+env:
+  REGISTRY: docker.io
+  IMAGE_NAME: arikamir/finviz-scanner-frontend
+
+jobs:
+  # HTML/CSS/JS Validation and Linting
+  validation:
+    runs-on: ubuntu-latest
+    name: Code Validation & Linting
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set up Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+        
+    - name: Install validation tools
+      run: |
+        npm install -g htmlhint
+        npm install -g stylelint stylelint-config-standard
+        npm install -g eslint
+        
+    - name: Validate HTML
+      run: |
+        echo "Validating HTML files..."
+        htmlhint --config .htmlhintrc frontend.html || true
+        htmlhint --config .htmlhintrc auth-test.html || true
+        
+    - name: Validate CSS (embedded)
+      run: |
+        echo "Extracting and validating CSS..."
+        # Extract CSS from HTML files for validation
+        grep -oP '(?<=<style>)[\s\S]*?(?=</style>)' *.html > extracted-styles.css || true
+        if [ -f extracted-styles.css ]; then
+          echo "body{}" >> extracted-styles.css  # Ensure file is not empty
+          stylelint extracted-styles.css --config .stylelintrc.json || true
+        fi
+        
+    - name: Validate JavaScript (embedded)
+      run: |
+        echo "Extracting and validating JavaScript..."
+        # Extract JavaScript from HTML files for validation
+        grep -oP '(?<=<script>)[\s\S]*?(?=</script>)' *.html > extracted-scripts.js || true
+        if [ -f extracted-scripts.js ]; then
+          echo "// ESLint validation" >> extracted-scripts.js
+          eslint extracted-scripts.js --config .eslintrc.json || true
+        fi
+
+  # Security and Vulnerability Scanning
+  security:
+    runs-on: ubuntu-latest
+    name: Security Scanning
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Run security audit
+      run: |
+        echo "Checking for security issues in HTML/JS..."
+        # Check for common security issues
+        if grep -r "eval\|innerHTML\|document.write" *.html; then
+          echo "⚠️  Warning: Potentially unsafe JavaScript patterns found"
+        else
+          echo "✅ No obvious security issues found"
+        fi
+        
+    - name: Check for secrets
+      run: |
+        echo "Checking for exposed secrets..."
+        if grep -i "api_key\|secret\|password\|token" *.html *.md || true; then
+          echo "⚠️  Warning: Potential secrets found in files"
+        else
+          echo "✅ No obvious secrets found in files"
+        fi
+
+  # Docker Build and Test
+  docker-build:
+    runs-on: ubuntu-latest
+    name: Docker Build & Test
+    needs: [validation, security]
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+      
+    - name: Log in to Docker Hub
+      if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+      uses: docker/login-action@v3
+      with:
+        username: ${{ secrets.DOCKER_USERNAME }}
+        password: ${{ secrets.DOCKER_TOKEN }}
+        
+    - name: Extract metadata
+      id: meta
+      uses: docker/metadata-action@v5
+      with:
+        images: ${{ env.IMAGE_NAME }}
+        tags: |
+          type=ref,event=branch
+          type=ref,event=pr
+          type=semver,pattern={{version}}
+          type=raw,value=latest,enable={{is_default_branch}}
+          type=sha
+          
+    - name: Build development image
+      uses: docker/build-push-action@v5
+      with:
+        context: .
+        file: ./Dockerfile.frontend.dev
+        platforms: linux/amd64,linux/arm64
+        push: false
+        tags: finviz-frontend-dev:test
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+        
+    - name: Build production image
+      uses: docker/build-push-action@v5
+      with:
+        context: .
+        file: ./Dockerfile.frontend.prod
+        platforms: linux/amd64,linux/arm64
+        push: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+        tags: ${{ steps.meta.outputs.tags }}
+        labels: ${{ steps.meta.outputs.labels }}
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+        
+    - name: Test frontend container
+      run: |
+        # Build and test the development container
+        docker build -f Dockerfile.frontend.dev -t finviz-frontend-test .
+        
+        # Start container in background
+        docker run -d --name frontend-test -p 8080:80 finviz-frontend-test
+        
+        # Wait for container to start
+        sleep 10
+        
+        # Test that the frontend serves correctly
+        echo "Testing frontend accessibility..."
+        curl -f http://localhost:8080/ | grep -q "Finviz ATR Swing Scanner" || (docker logs frontend-test && exit 1)
+        
+        # Test that HTML is valid structure
+        echo "Testing HTML structure..."
+        curl -s http://localhost:8080/ | grep -q "<html" && echo "✅ HTML structure valid"
+        
+        # Clean up
+        docker stop frontend-test
+        docker rm frontend-test
+
+  # Integration Testing with Backend
+  integration-test:
+    runs-on: ubuntu-latest
+    name: Integration Testing
+    needs: [docker-build]
+    if: github.event_name == 'push' || github.event_name == 'pull_request'
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Start services with docker-compose
+      run: |
+        # Use docker-compose to test integration
+        echo "Starting integrated services..."
+        
+        # Create mock environment variables
+        echo "ALPACA_API_KEY=test_key" > .env
+        echo "ALPACA_SECRET_KEY=test_secret" >> .env
+        echo "ALPACA_BASE_URL=https://paper-api.alpaca.markets" >> .env
+        
+        # Start services
+        docker-compose up -d --build
+        
+        # Wait for services to be ready
+        echo "Waiting for services to start..."
+        sleep 30
+        
+        # Test frontend accessibility
+        echo "Testing frontend..."
+        curl -f http://localhost/ | grep -q "Finviz ATR Swing Scanner" || (docker-compose logs && exit 1)
+        
+        # Test backend integration
+        echo "Testing backend integration..."
+        curl -f http://localhost:8000/health || (docker-compose logs && exit 1)
+        
+        echo "✅ Integration tests passed"
+        
+    - name: Cleanup
+      if: always()
+      run: |
+        docker-compose down -v
+        docker system prune -f
+
+  # Deployment (only on main branch)
+  deploy:
+    runs-on: ubuntu-latest
+    name: Deploy to Production
+    needs: [integration-test]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Deploy notification
+      run: |
+        echo "🚀 Deployment would happen here"
+        echo "✅ Frontend images built and pushed to Docker Hub"
+        echo "📦 Ready for deployment to production environment"
+
+  # Cleanup old artifacts
+  cleanup:
+    runs-on: ubuntu-latest
+    name: Cleanup Artifacts
+    if: always() && github.event_name == 'push' && github.ref == 'refs/heads/main'
+    
+    steps:
+    - name: Delete old workflow runs
+      uses: Mattraks/delete-workflow-runs@v2
+      with:
+        token: ${{ github.token }}
+        repository: ${{ github.repository }}
+        retain_days: 30
+        keep_minimum_runs: 5

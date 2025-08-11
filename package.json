@@ -1,0 +1,53 @@
+{
+  "name": "finviz-scanner-frontend",
+  "version": "1.0.0",
+  "description": "Frontend web interface for Finviz ATR Swing Scanner with Gmail authentication",
+  "main": "frontend.html",
+  "scripts": {
+    "lint:html": "htmlhint --config .htmlhintrc *.html",
+    "lint:css": "stylelint **/*.css",
+    "lint:js": "eslint **/*.js",
+    "lint": "npm run lint:html && npm run lint:css && npm run lint:js",
+    "docker:build": "docker build -f Dockerfile.frontend -t finviz-frontend .",
+    "docker:build:dev": "docker build -f Dockerfile.frontend.dev -t finviz-frontend:dev .",
+    "docker:build:prod": "docker build -f Dockerfile.frontend.prod -t finviz-frontend:prod .",
+    "docker:run": "docker run -p 80:80 finviz-frontend",
+    "docker:run:dev": "docker run -p 80:80 finviz-frontend:dev",
+    "compose:up": "docker-compose up -d",
+    "compose:down": "docker-compose down",
+    "compose:build": "docker-compose up --build -d",
+    "test": "echo \"Frontend testing via Docker containers in CI\"",
+    "start": "echo \"Open frontend.html in your browser or use Docker\"",
+    "validate": "npm run lint"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/arikamir/finviz-scanner-frontend.git"
+  },
+  "keywords": [
+    "finviz",
+    "scanner",
+    "trading",
+    "stocks",
+    "atr",
+    "swing-trading",
+    "frontend",
+    "web-app",
+    "gmail-auth"
+  ],
+  "author": "arikamir",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/arikamir/finviz-scanner-frontend/issues"
+  },
+  "homepage": "https://github.com/arikamir/finviz-scanner-frontend#readme",
+  "devDependencies": {
+    "htmlhint": "^1.1.4",
+    "stylelint": "^15.10.3",
+    "stylelint-config-standard": "^34.0.0",
+    "eslint": "^8.48.0"
+  },
+  "engines": {
+    "node": ">=16.0.0"
+  }
+}
