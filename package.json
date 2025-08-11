@@ -18,7 +18,12 @@
     "compose:build": "docker-compose up --build -d",
     "test": "echo \"Frontend testing via Docker containers in CI\"",
     "start": "echo \"Open frontend.html in your browser or use Docker\"",
-    "validate": "npm run lint"
+    "validate": "npm run lint",
+    "version:current": "node scripts/version.js current",
+    "version:patch": "node scripts/version.js bump patch",
+    "version:minor": "node scripts/version.js bump minor",
+    "version:major": "node scripts/version.js bump major",
+    "version:tag": "node scripts/version.js tag"
   },
   "repository": {
     "type": "git",

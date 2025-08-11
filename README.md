@@ -122,6 +122,26 @@ frontend/
    docker run -p 8080:80 finviz-frontend:test
    ```
 
+### Version Management
+
+This project follows [Semantic Versioning](https://semver.org/):
+
+```bash
+# Check current version
+npm run version:current
+
+# Bump version
+npm run version:patch    # 1.0.0 → 1.0.1 (bug fixes)
+npm run version:minor    # 1.0.0 → 1.1.0 (new features)
+npm run version:major    # 1.0.0 → 2.0.0 (breaking changes)
+
+# Create release tag
+npm run version:tag
+git push origin frontend-v$(npm run version:current --silent)
+```
+
+See [SEMANTIC_VERSIONING.md](../SEMANTIC_VERSIONING.md) for detailed guidelines.
+
 ### CI/CD Pipeline
 
 The repository includes a comprehensive CI/CD pipeline with:
