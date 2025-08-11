@@ -22,10 +22,20 @@ COPY --from=builder /etc/nginx/nginx.conf.template /etc/nginx/nginx.conf.templat
 
 # Create optimized startup script
 RUN printf '#!/bin/sh\n\
+# Set default domain if not provided\n\
+export DOMAIN_NAME=${DOMAIN_NAME:-localhost}\n\
 echo "Starting nginx with domain: $DOMAIN_NAME"\n\
 envsubst "\$DOMAIN_NAME" < /etc/nginx/nginx.conf.template > /etc/nginx/nginx.conf\n\
 echo "Nginx configuration processed successfully"\n\
-exec nginx -g "daemon off;"\n' > /docker-entrypoint.sh && \
+# Test nginx configuration\n\
+nginx -t\n\
+if [ $? -eq 0 ]; then\n\
+    echo "Nginx configuration is valid"\n\
+    exec nginx -g "daemon off;"\n\
+else\n\
+    echo "Nginx configuration is invalid, exiting..."\n\
+    exit 1\n\
+fi\n' > /docker-entrypoint.sh && \
     chmod +x /docker-entrypoint.sh
 
 # Security: Create non-root user for nginx worker processes
