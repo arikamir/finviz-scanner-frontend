@@ -1,5 +1,5 @@
-# Frontend/Full-stack Finviz Scanner Repository
-# This repo contains the frontend, Docker configs, and deployment scripts
+# Frontend-only Finviz Scanner Repository
+# This repo contains only the frontend web interface
 # The backend Python package has its own separate repository
 
 # Node.js dependencies and build artifacts
@@ -17,8 +17,7 @@ yarn.lock
 .env.auth
 *.env
 
-# Logs
-logs/
+# Logs (removed logs/ directory)
 *.log
 
 # Runtime data
