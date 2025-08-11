@@ -143,8 +143,8 @@ jobs:
         
     - name: Test frontend container
       run: |
-        # Build and test the development container
-        docker build -f Dockerfile.frontend.dev -t finviz-frontend-test .
+        # Build and test the standalone test container
+        docker build -f Dockerfile.frontend.test -t finviz-frontend-test .
         
         # Start container in background
         docker run -d --name frontend-test -p 8080:80 finviz-frontend-test
@@ -156,9 +156,17 @@ jobs:
         echo "Testing frontend accessibility..."
         curl -f http://localhost:8080/ | grep -q "Finviz ATR Swing Scanner" || (docker logs frontend-test && exit 1)
         
+        # Test health check endpoint
+        echo "Testing health endpoint..."
+        curl -f http://localhost:8080/health | grep -q "Frontend OK" && echo "✅ Health check working"
+        
         # Test that HTML is valid structure
         echo "Testing HTML structure..."
         curl -s http://localhost:8080/ | grep -q "<html" && echo "✅ HTML structure valid"
+        
+        # Test API fallback endpoints return test messages
+        echo "Testing API fallback..."
+        curl -s http://localhost:8080/api/test | grep -q "Frontend test mode" && echo "✅ API fallback working"
         
         # Clean up
         docker stop frontend-test

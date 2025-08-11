@@ -1,0 +1,27 @@
+# Test Frontend Dockerfile - for CI testing without backend dependencies
+FROM nginx:alpine
+
+# Install development tools with cache cleanup
+RUN apk add --no-cache gettext curl
+
+# Copy HTML content
+COPY frontend.html /usr/share/nginx/html/index.html
+
+# Copy nginx test configuration (standalone, no backend required)
+COPY nginx.conf.test /etc/nginx/nginx.conf
+
+# Create simple test startup script
+RUN echo '#!/bin/sh' > /docker-entrypoint.sh && \
+    echo 'echo "Starting test nginx server (standalone)"' >> /docker-entrypoint.sh && \
+    echo 'exec nginx -g "daemon off;"' >> /docker-entrypoint.sh && \
+    chmod +x /docker-entrypoint.sh
+
+# Expose test port
+EXPOSE 80
+
+# Fast health check for testing
+HEALTHCHECK --interval=5s --timeout=3s --start-period=5s --retries=2 \
+    CMD curl -f http://localhost/health || exit 1
+
+# Start nginx
+CMD ["/docker-entrypoint.sh"]
