@@ -1,0 +1,11 @@
+# Custom Certbot Dockerfile with proper entrypoint
+FROM certbot/certbot
+
+# Copy the entrypoint script
+COPY certbot-entrypoint.sh /entrypoint.sh
+
+# Make it executable
+RUN chmod +x /entrypoint.sh
+
+# Set the entrypoint
+ENTRYPOINT ["/entrypoint.sh"]

@@ -1,0 +1,1073 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Finviz ATR Swing Scanner</title>
+    <!-- Google OAuth Script -->
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+            min-height: 100vh;
+            padding: 20px;
+            color: #333;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+            backdrop-filter: blur(10px);
+        }
+
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 40px;
+            text-align: center;
+            position: relative;
+        }
+
+        .auth-section {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .user-info {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            background: rgba(255, 255, 255, 0.1);
+            padding: 10px 15px;
+            border-radius: 25px;
+            backdrop-filter: blur(10px);
+        }
+
+        .user-avatar {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+        }
+
+        .user-name {
+            font-size: 0.9rem;
+            font-weight: 500;
+        }
+
+        .login-button {
+            background: rgba(255, 255, 255, 0.1);
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            color: white;
+            padding: 10px 20px;
+            border-radius: 25px;
+            cursor: pointer;
+            font-weight: 500;
+            transition: all 0.3s ease;
+            backdrop-filter: blur(10px);
+        }
+
+        .login-button:hover {
+            background: rgba(255, 255, 255, 0.2);
+            border-color: rgba(255, 255, 255, 0.5);
+        }
+
+        .logout-button {
+            background: transparent;
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            color: white;
+            padding: 6px 12px;
+            border-radius: 15px;
+            cursor: pointer;
+            font-size: 0.8rem;
+            transition: all 0.3s ease;
+        }
+
+        .logout-button:hover {
+            background: rgba(255, 255, 255, 0.1);
+        }
+
+        .auth-required-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+        }
+
+        .auth-modal {
+            background: white;
+            padding: 40px;
+            border-radius: 20px;
+            text-align: center;
+            max-width: 400px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+        }
+
+        .auth-modal h3 {
+            margin-bottom: 20px;
+            color: #2d3748;
+        }
+
+        .auth-modal p {
+            margin-bottom: 30px;
+            color: #4a5568;
+            line-height: 1.6;
+        }
+
+        .header h1 {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+            font-weight: 700;
+        }
+
+        .header p {
+            font-size: 1.1rem;
+            opacity: 0.9;
+        }
+
+        .main-content {
+            padding: 40px;
+        }
+
+        .form-section {
+            background: white;
+            padding: 30px;
+            border-radius: 15px;
+            box-shadow: 0 8px 30px rgba(0, 0, 0, 0.08);
+            margin-bottom: 30px;
+        }
+
+        .form-section h2 {
+            color: #2d3748;
+            margin-bottom: 20px;
+            font-size: 1.5rem;
+            font-weight: 600;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 500;
+            color: #4a5568;
+        }
+
+        input, select {
+            width: 100%;
+            padding: 12px 16px;
+            border: 2px solid #e2e8f0;
+            border-radius: 8px;
+            font-size: 16px;
+            transition: all 0.3s ease;
+            background: white;
+        }
+
+        input:focus, select:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        .form-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+
+        .checkbox-group {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-top: 10px;
+        }
+
+        .checkbox-group input[type="checkbox"] {
+            width: auto;
+            margin: 0;
+        }
+
+        .btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 15px 30px;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 30px rgba(102, 126, 234, 0.3);
+        }
+
+        .btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .loading {
+            display: none;
+            text-align: center;
+            padding: 40px;
+            color: #667eea;
+        }
+
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #667eea;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .results-section {
+            display: none;
+        }
+
+        .market-overview {
+            background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+            color: white;
+            padding: 25px;
+            border-radius: 15px;
+            margin-bottom: 30px;
+            text-align: center;
+        }
+
+        .market-overview h3 {
+            font-size: 1.3rem;
+            margin-bottom: 10px;
+        }
+
+        .market-stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 20px;
+            margin-top: 20px;
+        }
+
+        .stat-card {
+            background: rgba(255, 255, 255, 0.2);
+            padding: 15px;
+            border-radius: 10px;
+            backdrop-filter: blur(10px);
+        }
+
+        .stat-card .label {
+            font-size: 0.9rem;
+            opacity: 0.9;
+            margin-bottom: 5px;
+        }
+
+        .stat-card .value {
+            font-size: 1.2rem;
+            font-weight: 700;
+        }
+
+        .stocks-grid {
+            display: grid;
+            gap: 20px;
+        }
+
+        .stock-card {
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 8px 30px rgba(0, 0, 0, 0.08);
+            overflow: hidden;
+            transition: all 0.3s ease;
+            border-left: 5px solid #667eea;
+        }
+
+        .stock-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 15px 40px rgba(0, 0, 0, 0.15);
+        }
+
+        .stock-header {
+            background: linear-gradient(135deg, #f7fafc 0%, #edf2f7 100%);
+            padding: 20px;
+            border-bottom: 1px solid #e2e8f0;
+        }
+
+        .stock-ticker {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: #2d3748;
+            margin-bottom: 5px;
+        }
+
+        .stock-price {
+            font-size: 1.2rem;
+            color: #667eea;
+            font-weight: 600;
+        }
+
+        .stock-trend {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-left: 10px;
+        }
+
+        .trend-up {
+            background: #c6f6d5;
+            color: #22543d;
+        }
+
+        .trend-down {
+            background: #fed7d7;
+            color: #742a2a;
+        }
+
+        .stock-body {
+            padding: 20px;
+        }
+
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .metric {
+            text-align: center;
+            padding: 10px;
+            background: #f7fafc;
+            border-radius: 8px;
+        }
+
+        .metric-label {
+            font-size: 0.8rem;
+            color: #718096;
+            margin-bottom: 5px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .metric-value {
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: #2d3748;
+        }
+
+        .rr-ratio {
+            font-weight: 700;
+        }
+
+        .rr-good {
+            color: #38a169;
+        }
+
+        .rr-fair {
+            color: #d69e2e;
+        }
+
+        .rr-poor {
+            color: #e53e3e;
+        }
+
+        .trading-info {
+            background: #f7fafc;
+            padding: 15px;
+            border-radius: 10px;
+            margin-top: 15px;
+        }
+
+        .trading-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid #e2e8f0;
+        }
+
+        .trading-row:last-child {
+            margin-bottom: 0;
+            padding-bottom: 0;
+            border-bottom: none;
+        }
+
+        .trading-label {
+            font-weight: 600;
+            color: #4a5568;
+        }
+
+        .trading-value {
+            color: #2d3748;
+            text-align: right;
+            flex: 1;
+            margin-left: 20px;
+        }
+
+        .setup-badge {
+            display: inline-block;
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .setup-breakout {
+            background: #ffd6cc;
+            color: #c53030;
+        }
+
+        .setup-pullback {
+            background: #c6f6d5;
+            color: #22543d;
+        }
+
+        .setup-review {
+            background: #feebc8;
+            color: #c05621;
+        }
+
+        .error-message {
+            background: #fed7d7;
+            color: #742a2a;
+            padding: 20px;
+            border-radius: 10px;
+            margin: 20px 0;
+            border-left: 4px solid #e53e3e;
+        }
+
+        .no-results {
+            text-align: center;
+            padding: 60px 20px;
+            color: #718096;
+        }
+
+        .no-results h3 {
+            margin-bottom: 10px;
+            color: #4a5568;
+        }
+
+        @media (max-width: 768px) {
+            .form-row {
+                grid-template-columns: 1fr;
+            }
+
+            .metrics-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+
+            .market-stats {
+                grid-template-columns: repeat(2, 1fr);
+            }
+
+            .trading-row {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+
+            .trading-value {
+                margin-left: 0;
+                margin-top: 5px;
+                text-align: left;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <!-- Authentication Section -->
+            <div class="auth-section">
+                <div id="loginSection" class="login-button" onclick="signInWithGoogle()">
+                    🔑 Login with Gmail
+                </div>
+                <div id="userSection" class="user-info" style="display: none;">
+                    <img id="userAvatar" class="user-avatar" src="" alt="User Avatar">
+                    <span id="userName" class="user-name"></span>
+                    <button class="logout-button" onclick="signOut()">Logout</button>
+                </div>
+            </div>
+            
+            <h1>🎯 Finviz ATR Swing Scanner</h1>
+            <p>Professional swing trading analysis with market trend filtering</p>
+        </div>
+
+        <div class="main-content">
+            <!-- Form Section -->
+            <div class="form-section">
+                <h2>🔍 Stock Screening Configuration</h2>
+                <form id="scanForm">
+                    <div class="form-group">
+                        <label for="screenerUrl">Finviz Screener URL</label>
+                        <input 
+                            type="url" 
+                            id="screenerUrl" 
+                            name="screenerUrl" 
+                            placeholder="https://finviz.com/screener.ashx?v=111&f=sh_avgvol_o500,sh_price_5to50"
+                            value="https://finviz.com/screener.ashx?v=111&f=sh_avgvol_o500,sh_price_5to50"
+                            required
+                        >
+                    </div>
+                    
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="maxTickers">Maximum Tickers</label>
+                            <select id="maxTickers" name="maxTickers">
+                                <option value="10">10 stocks</option>
+                                <option value="20" selected>20 stocks</option>
+                                <option value="30">30 stocks</option>
+                                <option value="50">50 stocks</option>
+                            </select>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="portfolioCash">Portfolio Cash ($)</label>
+                            <input 
+                                type="number" 
+                                id="portfolioCash" 
+                                name="portfolioCash" 
+                                value="10000" 
+                                min="1000" 
+                                max="1000000" 
+                                step="0.01"
+                                placeholder="10000"
+                            >
+                        </div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>Risk Management & Options</label>
+                        <div class="checkbox-group">
+                            <input type="checkbox" id="marketFilter" name="marketFilter" checked>
+                            <label for="marketFilter">Filter by market trend</label>
+                        </div>
+                        <div style="margin-top: 10px; padding: 15px; background: #f7fafc; border-radius: 8px; font-size: 0.9rem; color: #4a5568;">
+                            <strong>📊 Risk Management Rules:</strong><br>
+                            • Maximum 3% of portfolio risk per trade<br>
+                            • Maximum $50 risk per single trade<br>
+                            • Minimum 2:1 reward/risk ratio required
+                        </div>
+                    </div>
+                    
+                    <button type="submit" class="btn" id="scanButton">
+                        🚀 Analyze Stocks
+                    </button>
+                </form>
+            </div>
+
+            <!-- Loading Section -->
+            <div class="loading" id="loadingSection">
+                <div class="spinner"></div>
+                <h3>Analyzing Market & Stocks...</h3>
+                <p>This may take a few moments while we gather data from multiple sources.</p>
+            </div>
+
+            <!-- Results Section -->
+            <div class="results-section" id="resultsSection">
+                <!-- Market Overview will be inserted here -->
+                <div id="marketOverview"></div>
+                
+                <!-- Stocks Grid will be inserted here -->
+                <div id="stocksContainer"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Authentication Required Overlay -->
+    <div id="authOverlay" class="auth-required-overlay" style="display: none;">
+        <div class="auth-modal">
+            <h3>🔐 Authentication Required</h3>
+            <p>Please sign in with your Gmail account to access the stock scanner and analysis features.</p>
+            <div id="googleSignInButton"></div>
+        </div>
+    </div>
+
+    <script>
+        // Global variables
+        let currentUser = null;
+        let authToken = null;
+        
+        // Google OAuth Configuration
+        const GOOGLE_CLIENT_ID = '231341798483-t15q8u15ts5aclnb95v13eohk74ur01t.apps.googleusercontent.com'; // Replace with your actual client ID
+        
+        // Auto-detect protocol and use appropriate API URL
+        const isHTTPS = location.protocol === 'https:';
+        let API_BASE_URL;
+        
+        if (isHTTPS) {
+            // For HTTPS, use the nginx proxy path (same domain, /api prefix)
+            API_BASE_URL = `${location.protocol}//${location.host}/api`;
+        } else {
+            // For HTTP, connect directly to backend
+            API_BASE_URL = `http://${location.hostname}:8000`;
+        }
+        
+        console.log('Using API URL:', API_BASE_URL);
+        
+        // Initialize Google OAuth
+        function initializeGoogleAuth() {
+            google.accounts.id.initialize({
+                client_id: GOOGLE_CLIENT_ID,
+                callback: handleCredentialResponse,
+                auto_select: false,
+                cancel_on_tap_outside: false
+            });
+            
+            // Render the sign-in button in the modal
+            google.accounts.id.renderButton(
+                document.getElementById("googleSignInButton"),
+                {
+                    theme: "outline",
+                    size: "large",
+                    text: "signin_with",
+                    width: 300
+                }
+            );
+            
+            // Check for existing session
+            checkExistingAuth();
+        }
+        
+        // Handle Google OAuth response
+        function handleCredentialResponse(response) {
+            try {
+                // Decode the JWT token to get user info
+                const payload = JSON.parse(atob(response.credential.split('.')[1]));
+                
+                currentUser = {
+                    id: payload.sub,
+                    email: payload.email,
+                    name: payload.name,
+                    picture: payload.picture
+                };
+                
+                authToken = response.credential;
+                
+                // Store in localStorage for persistence
+                localStorage.setItem('finviz_user', JSON.stringify(currentUser));
+                localStorage.setItem('finviz_token', authToken);
+                
+                updateAuthUI();
+                hideAuthOverlay();
+                
+                console.log('✅ User signed in:', currentUser.name);
+                
+            } catch (error) {
+                console.error('❌ Authentication error:', error);
+                alert('Authentication failed. Please try again.');
+            }
+        }
+        
+        // Sign in with Google (for button in header)
+        function signInWithGoogle() {
+            showAuthOverlay();
+        }
+        
+        // Sign out function
+        function signOut() {
+            currentUser = null;
+            authToken = null;
+            
+            // Clear localStorage
+            localStorage.removeItem('finviz_user');
+            localStorage.removeItem('finviz_token');
+            
+            // Sign out from Google
+            google.accounts.id.disableAutoSelect();
+            
+            updateAuthUI();
+            showAuthOverlay();
+            
+            console.log('✅ User signed out');
+        }
+        
+        // Check for existing authentication
+        function checkExistingAuth() {
+            const storedUser = localStorage.getItem('finviz_user');
+            const storedToken = localStorage.getItem('finviz_token');
+            
+            if (storedUser && storedToken) {
+                try {
+                    currentUser = JSON.parse(storedUser);
+                    authToken = storedToken;
+                    
+                    // Verify token is still valid (basic check)
+                    const payload = JSON.parse(atob(authToken.split('.')[1]));
+                    const currentTime = Math.floor(Date.now() / 1000);
+                    
+                    if (payload.exp && payload.exp > currentTime) {
+                        updateAuthUI();
+                        hideAuthOverlay();
+                        console.log('✅ Restored user session:', currentUser.name);
+                    } else {
+                        // Token expired
+                        signOut();
+                    }
+                } catch (error) {
+                    console.error('❌ Error restoring session:', error);
+                    signOut();
+                }
+            } else {
+                showAuthOverlay();
+            }
+        }
+        
+        // Update authentication UI
+        function updateAuthUI() {
+            const loginSection = document.getElementById('loginSection');
+            const userSection = document.getElementById('userSection');
+            const userAvatar = document.getElementById('userAvatar');
+            const userName = document.getElementById('userName');
+            
+            if (currentUser) {
+                loginSection.style.display = 'none';
+                userSection.style.display = 'flex';
+                userAvatar.src = currentUser.picture;
+                userName.textContent = currentUser.name;
+            } else {
+                loginSection.style.display = 'block';
+                userSection.style.display = 'none';
+            }
+        }
+        
+        // Show authentication overlay
+        function showAuthOverlay() {
+            document.getElementById('authOverlay').style.display = 'flex';
+        }
+        
+        // Hide authentication overlay
+        function hideAuthOverlay() {
+            document.getElementById('authOverlay').style.display = 'none';
+        }
+        
+        // Check if user is authenticated
+        function isAuthenticated() {
+            return currentUser !== null && authToken !== null;
+        }
+        
+        // Form submission with authentication check
+        document.getElementById('scanForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            if (!isAuthenticated()) {
+                showAuthOverlay();
+                return;
+            }
+            
+            const formData = new FormData(e.target);
+            const scanData = {
+                screener_url: formData.get('screenerUrl'),
+                max_tickers: parseInt(formData.get('maxTickers')),
+                market_filter: formData.has('marketFilter'),
+                portfolio_cash: parseFloat(formData.get('portfolioCash'))
+            };
+            
+            await performScan(scanData);
+        });
+
+        async function performScan(scanData) {
+            if (!isAuthenticated()) {
+                showAuthOverlay();
+                return;
+            }
+            
+            const loadingSection = document.getElementById('loadingSection');
+            const resultsSection = document.getElementById('resultsSection');
+            const scanButton = document.getElementById('scanButton');
+            
+            // Show loading state
+            loadingSection.style.display = 'block';
+            resultsSection.style.display = 'none';
+            scanButton.disabled = true;
+            scanButton.textContent = '🔄 Analyzing...';
+            
+            try {
+                const response = await fetch(`${API_BASE_URL}/scan`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${authToken}`,
+                        'X-User-Email': currentUser.email
+                    },
+                    body: JSON.stringify(scanData)
+                });
+                
+                if (response.status === 401) {
+                    // Token expired or invalid
+                    signOut();
+                    return;
+                }
+                
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.detail || `HTTP ${response.status}`);
+                }
+                
+                const data = await response.json();
+                displayResults(data);
+                
+            } catch (error) {
+                displayError(error.message);
+            } finally {
+                // Hide loading state
+                loadingSection.style.display = 'none';
+                scanButton.disabled = false;
+                scanButton.textContent = '🚀 Analyze Stocks';
+            }
+        }
+
+        function displayResults(data) {
+            const resultsSection = document.getElementById('resultsSection');
+            const marketOverview = document.getElementById('marketOverview');
+            const stocksContainer = document.getElementById('stocksContainer');
+            
+            // Create market overview
+            marketOverview.innerHTML = `
+                <div class="market-overview">
+                    <h3>📈 Market Analysis</h3>
+                    <div class="market-stats">
+                        <div class="stat-card">
+                            <div class="label">Market Trend</div>
+                            <div class="value">${data.market_trend}</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="label">Total Analyzed</div>
+                            <div class="value">${data.total_analyzed}</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="label">Filtered Results</div>
+                            <div class="value">${data.filtered_count}</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="label">Analysis Time</div>
+                            <div class="value">${new Date(data.analysis_time).toLocaleTimeString()}</div>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            // Create stocks grid
+            if (data.stocks && data.stocks.length > 0) {
+                stocksContainer.innerHTML = `
+                    <div class="stocks-grid">
+                        ${data.stocks.map(stock => createStockCard(stock)).join('')}
+                    </div>
+                `;
+            } else {
+                stocksContainer.innerHTML = `
+                    <div class="no-results">
+                        <h3>No stocks found</h3>
+                        <p>Try adjusting your filters or screener URL</p>
+                    </div>
+                `;
+            }
+            
+            resultsSection.style.display = 'block';
+        }
+
+        function createStockCard(stock) {
+            const trendClass = stock.trend === 'Up' ? 'trend-up' : 'trend-down';
+            const setupClass = `setup-${stock.setup.toLowerCase().replace('/', '-').replace(' ', '-')}`;
+            
+            let rrClass = 'rr-poor';
+            if (stock.rr_ratio >= 2.0) rrClass = 'rr-good';
+            else if (stock.rr_ratio >= 1.5) rrClass = 'rr-fair';
+            
+            // Determine if trade should be avoided
+            const isAvoidTrade = stock.shares_to_buy === 0 || stock.order_type === 'AVOID';
+            const cardStyle = isAvoidTrade ? 'border-left: 5px solid #e53e3e;' : 'border-left: 5px solid #667eea;';
+            
+            return `
+                <div class="stock-card" style="${cardStyle}">
+                    <div class="stock-header">
+                        <div class="stock-ticker">${stock.ticker}</div>
+                        <div class="stock-price">
+                            $${stock.latest.toFixed(2)}
+                            <span class="stock-trend ${trendClass}">${stock.trend}</span>
+                        </div>
+                    </div>
+                    <div class="stock-body">
+                        ${!isAvoidTrade ? `
+                        <div style="background: #f0fff4; border: 1px solid #68d391; border-radius: 8px; padding: 15px; margin-bottom: 20px;">
+                            <h4 style="color: #22543d; margin-bottom: 10px;">📋 Trading Instructions</h4>
+                            <div style="margin-bottom: 8px;"><strong>Shares to Buy:</strong> ${stock.shares_to_buy} shares</div>
+                            <div style="margin-bottom: 8px;"><strong>Order Type:</strong> ${stock.order_type}</div>
+                            <div style="margin-bottom: 8px;"><strong>Position Value:</strong> $${stock.position_value.toFixed(2)}</div>
+                            <div style="margin-bottom: 8px;"><strong>Risk Amount:</strong> $${stock.risk_amount.toFixed(2)} (${stock.risk_percentage}%)</div>
+                            <div style="margin-bottom: 8px;"><strong>Potential Gain:</strong> $${stock.potential_gain.toFixed(2)} (${stock.potential_gain_percentage.toFixed(1)}%)</div>
+                            <div><strong>Margin:</strong> ${stock.margin_requirement}</div>
+                        </div>
+                        
+                        <div style="background: #fffaf0; border: 1px solid #ed8936; border-radius: 8px; padding: 15px; margin-bottom: 20px;">
+                            <h4 style="color: #c05621; margin-bottom: 10px;">🎯 Bracket Order</h4>
+                            <div style="font-family: monospace; font-size: 0.9rem; line-height: 1.6;">
+                                ${stock.bracket_order.split(' | ').map(part => `<div>${part}</div>`).join('')}
+                            </div>
+                        </div>
+                        
+                        <div style="background: #e6fffa; border: 1px solid #4fd1c7; border-radius: 8px; padding: 15px; margin-bottom: 20px;">
+                            <h4 style="color: #234e52; margin-bottom: 10px;">💰 Profit/Loss Scenarios</h4>
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; font-size: 0.9rem;">
+                                <div style="text-align: center; padding: 8px; background: #f0fff4; border-radius: 6px;">
+                                    <div style="font-weight: bold; color: #22543d;">If Target Hit</div>
+                                    <div style="color: #38a169; font-size: 1.1rem; font-weight: 600;">+$${stock.potential_gain.toFixed(2)}</div>
+                                    <div style="color: #38a169;">(+${stock.potential_gain_percentage.toFixed(1)}%)</div>
+                                </div>
+                                <div style="text-align: center; padding: 8px; background: #fed7d7; border-radius: 6px;">
+                                    <div style="font-weight: bold; color: #742a2a;">If Stop Hit</div>
+                                    <div style="color: #e53e3e; font-size: 1.1rem; font-weight: 600;">-$${stock.risk_amount.toFixed(2)}</div>
+                                    <div style="color: #e53e3e;">(-${stock.risk_percentage}%)</div>
+                                </div>
+                            </div>
+                        </div>
+                        ` : `
+                        <div style="background: #fed7d7; border: 1px solid #e53e3e; border-radius: 8px; padding: 15px; margin-bottom: 20px;">
+                            <h4 style="color: #742a2a; margin-bottom: 10px;">⚠️ Trade Not Recommended</h4>
+                            <div style="color: #742a2a;">${stock.bracket_order}</div>
+                        </div>
+                        `}
+                        
+                        <div class="metrics-grid">
+                            <div class="metric">
+                                <div class="metric-label">ATR14</div>
+                                <div class="metric-value">$${stock.atr14.toFixed(2)}</div>
+                            </div>
+                            <div class="metric">
+                                <div class="metric-label">Entry</div>
+                                <div class="metric-value">$${stock.entry.toFixed(2)}</div>
+                            </div>
+                            <div class="metric">
+                                <div class="metric-label">Stop</div>
+                                <div class="metric-value">$${stock.stop.toFixed(2)}</div>
+                            </div>
+                            <div class="metric">
+                                <div class="metric-label">Target</div>
+                                <div class="metric-value">$${stock.take_profit.toFixed(2)}</div>
+                            </div>
+                            <div class="metric">
+                                <div class="metric-label">R/R Ratio</div>
+                                <div class="metric-value rr-ratio ${rrClass}">${stock.rr_ratio.toFixed(2)}</div>
+                            </div>
+                            <div class="metric">
+                                <div class="metric-label">Setup</div>
+                                <div class="metric-value">
+                                    <span class="setup-badge ${setupClass}">${stock.setup}</span>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="trading-info">
+                            <div class="trading-row">
+                                <div class="trading-label">Support:</div>
+                                <div class="trading-value">$${stock.support.toFixed(2)}</div>
+                            </div>
+                            <div class="trading-row">
+                                <div class="trading-label">Resistance:</div>
+                                <div class="trading-value">$${stock.resistance.toFixed(2)}</div>
+                            </div>
+                            <div class="trading-row">
+                                <div class="trading-label">Exit Criteria:</div>
+                                <div class="trading-value" style="font-size: 0.8rem;">${stock.exit_criteria}</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        function displayError(message) {
+            const resultsSection = document.getElementById('resultsSection');
+            const stocksContainer = document.getElementById('stocksContainer');
+            
+            document.getElementById('marketOverview').innerHTML = '';
+            stocksContainer.innerHTML = `
+                <div class="error-message">
+                    <h3>❌ Error</h3>
+                    <p>${message}</p>
+                    <p>Please check that the API server is running and the screener URL is valid.</p>
+                </div>
+            `;
+            
+            resultsSection.style.display = 'block';
+        }
+
+        // Check API health on page load with authentication
+        async function checkApiHealth() {
+            try {
+                const headers = {};
+                if (isAuthenticated()) {
+                    headers['Authorization'] = `Bearer ${authToken}`;
+                    headers['X-User-Email'] = currentUser.email;
+                }
+                
+                const response = await fetch(`${API_BASE_URL}/health`, { headers });
+                if (response.ok) {
+                    console.log('✅ API server is running');
+                } else {
+                    console.warn('⚠️ API server may not be running properly');
+                }
+            } catch (error) {
+                console.warn('⚠️ Could not connect to API server');
+            }
+        }
+
+        // Initialize everything when page loads
+        window.addEventListener('load', function() {
+            // Initialize Google Auth when the library is loaded
+            if (typeof google !== 'undefined') {
+                initializeGoogleAuth();
+            } else {
+                // Wait for Google library to load
+                const checkGoogle = setInterval(() => {
+                    if (typeof google !== 'undefined') {
+                        clearInterval(checkGoogle);
+                        initializeGoogleAuth();
+                    }
+                }, 100);
+            }
+            
+            // Check API health
+            checkApiHealth();
+        });
+    </script>
+</body>
+</html>

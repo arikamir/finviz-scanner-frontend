@@ -1,0 +1,140 @@
+# Frontend/Full-stack Finviz Scanner Repository
+# This repo contains the frontend, Docker configs, and deployment scripts
+# The backend Python package has its own separate repository
+
+# Environment files with secrets
+.env
+.env.local
+.env.prod
+.env.auth
+*.env
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Runtime data
+pids
+*.pid
+*.seed
+*.pid.lock
+
+# Coverage directory used by tools like istanbul
+coverage/
+*.lcov
+
+# nyc test coverage
+.nyc_output
+
+# Dependency directories
+node_modules/
+jspm_packages/
+
+# Optional npm cache directory
+.npm
+
+# Optional REPL history
+.node_repl_history
+
+# Output of 'npm pack'
+*.tgz
+
+# Yarn Integrity file
+.yarn-integrity
+
+# dotenv environment variables file
+.env.test
+.env.production
+
+# parcel-bundler cache (https://parceljs.org/)
+.cache
+.parcel-cache
+
+# next.js build output
+.next
+
+# nuxt.js build output
+.nuxt
+
+# vuepress build output
+.vuepress/dist
+
+# Serverless directories
+.serverless
+
+# FuseBox cache
+.fusebox/
+
+# DynamoDB Local files
+.dynamodb/
+
+# TernJS port file
+.tern-port
+
+# Docker
+.docker/
+docker-compose.override.yml
+
+# SSL Certificates
+certbot/
+*.pem
+*.crt
+*.key
+
+# Temporary files
+*.tmp
+*.temp
+.temp/
+.tmp/
+
+# Editor directories and files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Python (in case we have any Python scripts here)
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+.venv/
+ENV/
+env.bak/
+venv.bak/
+
+# Build outputs
+dist/
+build/
+
+# Backup directory - but track the structure
+backup/old_structure/
+# Keep backup directory structure but ignore contents
+backup/*
+!backup/README.md
+
+# Ignore the nested backend git repo to avoid confusion
+finviz_scanner/.git/
+finviz_scanner/htmlcov/
+finviz_scanner/.coverage
+finviz_scanner/.pytest_cache/
+finviz_scanner/.mypy_cache/
+finviz_scanner/dist/
+finviz_scanner/build/
+finviz_scanner/*.egg-info/

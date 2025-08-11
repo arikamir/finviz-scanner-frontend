@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gmail Auth Test</title>
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            line-height: 1.6;
+        }
+        .container {
+            background: #f5f5f5;
+            padding: 30px;
+            border-radius: 10px;
+            text-align: center;
+        }
+        .user-info {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 20px 0;
+            text-align: left;
+        }
+        button {
+            background: #4285f4;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 10px;
+        }
+        button:hover {
+            background: #3367d6;
+        }
+        .logout-btn {
+            background: #dc3545;
+        }
+        .logout-btn:hover {
+            background: #c82333;
+        }
+        pre {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 4px;
+            text-align: left;
+            overflow-x: auto;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔐 Gmail Authentication Test</h1>
+        <p>Use this page to test Gmail authentication before using the main scanner.</p>
+        
+        <div id="loginSection">
+            <h3>Sign In</h3>
+            <div id="googleSignInButton"></div>
+        </div>
+        
+        <div id="userSection" style="display: none;">
+            <h3>Authentication Successful!</h3>
+            <div id="userInfo" class="user-info"></div>
+            <button class="logout-btn" onclick="signOut()">Sign Out</button>
+        </div>
+        
+        <div id="tokenSection" style="display: none; margin-top: 30px;">
+            <h3>Token Information</h3>
+            <p>This is your JWT token (for debugging):</p>
+            <pre id="tokenDisplay"></pre>
+        </div>
+    </div>
+
+    <script>
+        // Replace with your actual Google Client ID
+        const GOOGLE_CLIENT_ID = '231341798483-t15q8u15ts5aclnb95v13eohk74ur01t.apps.googleusercontent.com';
+        
+        let currentUser = null;
+        let authToken = null;
+
+        function initializeGoogleAuth() {
+            if (GOOGLE_CLIENT_ID === 'YOUR_GOOGLE_CLIENT_ID_HERE') {
+                document.getElementById('loginSection').innerHTML = `
+                    <div style="background: #ffe6e6; padding: 20px; border-radius: 8px; color: #721c24;">
+                        <h3>⚠️ Configuration Required</h3>
+                        <p>Please update the GOOGLE_CLIENT_ID in this test file with your actual Google OAuth Client ID.</p>
+                        <p>See GMAIL_LOGIN_SETUP.md for setup instructions.</p>
+                    </div>
+                `;
+                return;
+            }
+
+            google.accounts.id.initialize({
+                client_id: GOOGLE_CLIENT_ID,
+                callback: handleCredentialResponse,
+                auto_select: false,
+                cancel_on_tap_outside: false
+            });
+            
+            google.accounts.id.renderButton(
+                document.getElementById("googleSignInButton"),
+                {
+                    theme: "outline",
+                    size: "large",
+                    text: "signin_with",
+                    width: 300
+                }
+            );
+        }
+
+        function handleCredentialResponse(response) {
+            try {
+                authToken = response.credential;
+                
+                // Decode JWT payload (without verification for demo)
+                const payload = JSON.parse(atob(authToken.split('.')[1]));
+                
+                currentUser = {
+                    id: payload.sub,
+                    email: payload.email,
+                    name: payload.name,
+                    picture: payload.picture
+                };
+                
+                updateUI();
+                
+            } catch (error) {
+                console.error('Authentication error:', error);
+                alert('Authentication failed: ' + error.message);
+            }
+        }
+
+        function signOut() {
+            currentUser = null;
+            authToken = null;
+            google.accounts.id.disableAutoSelect();
+            updateUI();
+        }
+
+        function updateUI() {
+            const loginSection = document.getElementById('loginSection');
+            const userSection = document.getElementById('userSection');
+            const userInfo = document.getElementById('userInfo');
+            const tokenSection = document.getElementById('tokenSection');
+            const tokenDisplay = document.getElementById('tokenDisplay');
+            
+            if (currentUser) {
+                loginSection.style.display = 'none';
+                userSection.style.display = 'block';
+                tokenSection.style.display = 'block';
+                
+                userInfo.innerHTML = `
+                    <div style="display: flex; align-items: center; gap: 15px; margin-bottom: 15px;">
+                        <img src="${currentUser.picture}" alt="Avatar" style="width: 50px; height: 50px; border-radius: 50%;">
+                        <div>
+                            <div style="font-weight: bold; font-size: 1.1em;">${currentUser.name}</div>
+                            <div style="color: #666;">${currentUser.email}</div>
+                            <div style="font-size: 0.9em; color: #888;">ID: ${currentUser.id}</div>
+                        </div>
+                    </div>
+                    <div style="margin-top: 15px; padding: 10px; background: #e8f5e8; border-radius: 4px;">
+                        ✅ Ready to use with Finviz Scanner
+                    </div>
+                `;
+                
+                tokenDisplay.textContent = authToken;
+                
+            } else {
+                loginSection.style.display = 'block';
+                userSection.style.display = 'none';
+                tokenSection.style.display = 'none';
+            }
+        }
+
+        // Initialize when Google library loads
+        window.addEventListener('load', function() {
+            if (typeof google !== 'undefined') {
+                initializeGoogleAuth();
+            } else {
+                const checkGoogle = setInterval(() => {
+                    if (typeof google !== 'undefined') {
+                        clearInterval(checkGoogle);
+                        initializeGoogleAuth();
+                    }
+                }, 100);
+            }
+        });
+    </script>
+</body>
+</html>
