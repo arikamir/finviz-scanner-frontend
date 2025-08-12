@@ -19,21 +19,56 @@ COPY frontend.html /usr/share/nginx/html/index.html
 
 # Copy processed configuration
 COPY --from=builder /etc/nginx/nginx.conf.template /etc/nginx/nginx.conf.template
+COPY nginx.conf.standalone /etc/nginx/nginx.conf.standalone
 
 # Create optimized startup script
 RUN printf '#!/bin/sh\n\
-# Set default domain if not provided\n\
+# Set default values\n\
 export DOMAIN_NAME=${DOMAIN_NAME:-localhost}\n\
+export BACKEND_HOST=${BACKEND_HOST:-backend}\n\
+export BACKEND_PORT=${BACKEND_PORT:-8000}\n\
+export STANDALONE_MODE=${STANDALONE_MODE:-false}\n\
+\n\
 echo "Starting nginx with domain: $DOMAIN_NAME"\n\
-envsubst "\$DOMAIN_NAME" < /etc/nginx/nginx.conf.template > /etc/nginx/nginx.conf\n\
+\n\
+# Check if we should run in standalone mode\n\
+if [ "$STANDALONE_MODE" = "true" ]; then\n\
+    echo "Running in STANDALONE mode (no backend required)"\n\
+    # Use standalone configuration\n\
+    if [ -f "/etc/nginx/nginx.conf.standalone" ]; then\n\
+        envsubst "\$DOMAIN_NAME" < /etc/nginx/nginx.conf.standalone > /etc/nginx/nginx.conf\n\
+    else\n\
+        echo "Warning: standalone config not found, using template with backend disabled"\n\
+        # Disable backend by setting to localhost (will fail gracefully)\n\
+        export BACKEND_HOST=127.0.0.1\n\
+        envsubst "\$DOMAIN_NAME \$BACKEND_HOST \$BACKEND_PORT" < /etc/nginx/nginx.conf.template > /etc/nginx/nginx.conf\n\
+    fi\n\
+else\n\
+    echo "Running in FULL mode - backend: $BACKEND_HOST:$BACKEND_PORT"\n\
+    # Try to ping backend to see if it exists\n\
+    if ping -c 1 -W 5 "$BACKEND_HOST" >/dev/null 2>&1; then\n\
+        echo "✓ Backend host $BACKEND_HOST is reachable"\n\
+    else\n\
+        echo "⚠ Backend host $BACKEND_HOST is not reachable - API calls will fail"\n\
+    fi\n\
+    envsubst "\$DOMAIN_NAME \$BACKEND_HOST \$BACKEND_PORT" < /etc/nginx/nginx.conf.template > /etc/nginx/nginx.conf\n\
+fi\n\
+\n\
 echo "Nginx configuration processed successfully"\n\
-# Test nginx configuration\n\
-nginx -t\n\
-if [ $? -eq 0 ]; then\n\
-    echo "Nginx configuration is valid"\n\
+\n\
+# Test nginx configuration with detailed output\n\
+echo "Testing nginx configuration..."\n\
+if nginx -t; then\n\
+    echo "✓ Nginx configuration is valid"\n\
+    echo "Starting nginx..."\n\
     exec nginx -g "daemon off;"\n\
 else\n\
-    echo "Nginx configuration is invalid, exiting..."\n\
+    echo "✗ Nginx configuration test failed:"\n\
+    nginx -t\n\
+    echo "Generated configuration preview:"\n\
+    head -50 /etc/nginx/nginx.conf\n\
+    echo "..."\n\
+    echo "Exiting due to invalid configuration"\n\
     exit 1\n\
 fi\n' > /docker-entrypoint.sh && \
     chmod +x /docker-entrypoint.sh

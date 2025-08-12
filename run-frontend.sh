@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Frontend deployment script for Finviz Scanner
-# Usage: ./run-frontend.sh [domain_name]
+# Usage: ./run-frontend.sh [domain_name] [--standalone]
 
 set -euo pipefail
 
@@ -9,13 +9,57 @@ set -euo pipefail
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 RED='\033[0;31m'
+BLUE='\033[0;34m'
 NC='\033[0m'
 
-# Get domain name from argument or environment
-DOMAIN_NAME="${1:-${DOMAIN_NAME:-localhost}}"
+# Parse arguments
+DOMAIN_NAME=""
+STANDALONE_MODE=false
+
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        --standalone)
+            STANDALONE_MODE=true
+            shift
+            ;;
+        --help|-h)
+            echo "Usage: $0 [domain_name] [--standalone]"
+            echo ""
+            echo "Options:"
+            echo "  domain_name     Domain name for the frontend (default: localhost)"
+            echo "  --standalone    Run in standalone mode (no backend required)"
+            echo "  --help, -h      Show this help message"
+            echo ""
+            echo "Examples:"
+            echo "  $0                                    # Run with localhost"
+            echo "  $0 amir-trader.duckdns.org          # Run with custom domain"
+            echo "  $0 --standalone                      # Run standalone mode"
+            echo "  $0 example.com --standalone          # Run standalone with custom domain"
+            exit 0
+            ;;
+        *)
+            if [[ -z "$DOMAIN_NAME" ]]; then
+                DOMAIN_NAME="$1"
+            else
+                echo -e "${RED}[ERROR]${NC} Unknown argument: $1"
+                exit 1
+            fi
+            shift
+            ;;
+    esac
+done
+
+# Set default domain if not provided
+DOMAIN_NAME="${DOMAIN_NAME:-${DOMAIN_NAME:-localhost}}"
 
 echo -e "${GREEN}[INFO]${NC} Starting Finviz Scanner Frontend"
 echo -e "${GREEN}[INFO]${NC} Domain: $DOMAIN_NAME"
+
+if [[ "$STANDALONE_MODE" == true ]]; then
+    echo -e "${YELLOW}[INFO]${NC} Running in STANDALONE mode (no backend required)"
+else
+    echo -e "${BLUE}[INFO]${NC} Running in FULL mode (requires backend service)"
+fi
 
 # Load environment variables if .env.prod exists
 if [[ -f ".env.prod" ]]; then
