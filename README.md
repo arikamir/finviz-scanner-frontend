@@ -1,6 +1,6 @@
 # Finviz Scanner Frontend
 
-A modern web interface for the Finviz ATR Swing Scanner with responsive design and Docker support.
+A modern web interface for the Finviz ATR Swing Scanner with responsive design and consolidated Docker support.
 
 ## 🚀 Overview
 
@@ -13,11 +13,16 @@ frontend/
 ├── frontend.html                   # Main web application
 ├── auth-test.html                  # Authentication testing page
 ├── README.md                       # This file
+├── Makefile                        # Build and deployment commands
 ├── package.json                    # Node.js configuration and scripts
-├── .gitignore                      # Git ignore file
+├── .gitignore                      # Git ignore rules
+├── .dockerignore                   # Docker build context exclusions
 ├── 
 ├── Docker Configuration:
-├── Dockerfile.frontend             # Production frontend container
+├── Dockerfile                      # Consolidated multi-stage Dockerfile
+├── docker-compose.yml              # Production deployment
+├── docker-compose.dev.yml          # Development environment  
+├── docker-compose.test.yml         # Testing environment
 ├── Dockerfile.frontend.dev         # Development container
 ├── Dockerfile.frontend.prod        # Optimized production container
 ├── Dockerfile.frontend.test        # CI testing container
@@ -48,14 +53,59 @@ frontend/
 - **Market Trend Display**: Visual indicators for market conditions
 
 ### 🐳 Docker Support
+- **Consolidated Dockerfile**: Single, multi-stage Dockerfile for all environments
 - **Multi-environment Builds**: Development, production, and testing containers
 - **Multi-architecture**: Supports both AMD64 and ARM64 platforms
 - **Nginx Integration**: High-performance web server with SSL support
 - **Health Checks**: Built-in container health monitoring
+- **Environment Variables**: Flexible configuration for different deployments
 
 ## 🚀 Quick Start
 
-### Local Development
+### Using Makefile (Recommended)
+
+The easiest way to work with the frontend is using the provided Makefile:
+
+```bash
+# Development
+make dev           # Build and run development environment
+make run-dev       # Run development (http://localhost:8080)
+
+# Production  
+make deploy        # Build and run production environment
+make run-prod      # Run production (http://localhost:80)
+
+# Testing
+make run-test      # Run test environment (http://localhost:9080)
+
+# Utilities
+make help          # Show all available commands
+make test          # Run health checks on all environments
+make logs-dev      # Show development logs
+make clean         # Clean up all Docker resources
+```
+
+### Manual Docker Commands
+
+1. **Development environment:**
+   ```bash
+   docker-compose -f docker-compose.dev.yml up -d
+   # Visit http://localhost:8080
+   ```
+
+2. **Production deployment:**
+   ```bash
+   docker-compose up -d
+   # Visit http://localhost:80
+   ```
+
+3. **Testing environment:**
+   ```bash
+   docker-compose -f docker-compose.test.yml up -d
+   # Visit http://localhost:9080
+   ```
+
+### Local Development (No Docker)
 
 1. **Open the HTML file directly:**
    ```bash
@@ -68,32 +118,38 @@ frontend/
    # Then visit http://localhost:8080/frontend.html
    ```
 
-### Docker Development
+## ⚙️ Configuration
 
-1. **Build and run development container:**
-   ```bash
-   docker build -f Dockerfile.frontend.dev -t finviz-frontend:dev .
-   docker run -p 8080:80 finviz-frontend:dev
-   ```
+### Environment Variables
 
-2. **Visit the application:**
-   ```
-   http://localhost:8080
-   ```
+The consolidated Dockerfile supports multiple environment variables for flexible deployment:
 
-### Production Deployment
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `BUILD_ENV` | `production` | Build environment: `development`, `production`, or `test` |
+| `DOMAIN_NAME` | `localhost` | Domain name for nginx configuration |
+| `BACKEND_HOST` | `backend` | Backend API hostname |
+| `BACKEND_PORT` | `8000` | Backend API port |
+| `STANDALONE_MODE` | `false` | Run without backend (frontend-only) |
+| `SSL_MODE` | `auto` | SSL configuration: `auto`, `enabled`, `disabled`, `letsencrypt`, `selfsigned` |
 
-1. **Build production container:**
-   ```bash
-   docker build -f Dockerfile.frontend.prod -t finviz-frontend:prod .
-   ```
+### Build Targets
 
-2. **Run with environment variables:**
-   ```bash
-   docker run -p 80:80 -p 443:443 \
-     -e DOMAIN_NAME=your-domain.com \
-     finviz-frontend:prod
-   ```
+The Dockerfile includes three build targets:
+
+1. **development**: Lightweight, fast startup, development tools included
+2. **test**: Minimal configuration for CI/CD testing
+3. **production**: Optimized, security-hardened, non-root user
+
+### SSL Configuration
+
+The frontend supports multiple SSL modes:
+
+- **auto**: Automatically detects available SSL certificates
+- **enabled**: Forces HTTPS with Let's Encrypt certificates
+- **disabled**: HTTP-only mode
+- **letsencrypt**: Use Let's Encrypt certificates
+- **selfsigned**: Use self-signed certificates for local testing
 
 ## 🔧 Development
 
@@ -109,18 +165,35 @@ frontend/
    npm install -g htmlhint stylelint eslint
    ```
 
-2. **Validate code:**
+2. **Start development environment:**
+   ```bash
+   make dev
+   # or manually:
+   # docker-compose -f docker-compose.dev.yml up -d
+   ```
+
+3. **Validate code:**
    ```bash
    htmlhint --config .htmlhintrc frontend.html
-   stylelint "**/*.css" --config .stylelintrc.json
+   stylelint "**/*.css" --config .stylelintrc.json  
    eslint "**/*.js" --config .eslintrc.json
    ```
 
-3. **Test with Docker:**
+4. **Run tests:**
    ```bash
-   docker build -f Dockerfile.frontend.test -t finviz-frontend:test .
-   docker run -p 8080:80 finviz-frontend:test
+   make test
    ```
+
+### File Structure for Development
+
+```
+frontend/
+├── frontend.html          # Main application (edit this)
+├── Dockerfile            # Consolidated multi-stage build
+├── Makefile              # Development commands
+├── docker-compose*.yml   # Environment-specific configurations
+└── nginx.conf.*          # Nginx configurations for different modes
+```
 
 ### Version Management
 

@@ -96,7 +96,7 @@ else
     echo -e "${GREEN}[INFO]${NC} Using docker run..."
     
     # Build the image
-    docker build -f Dockerfile.frontend.prod -t finviz-scanner-frontend .
+    docker build --target production -t finviz-scanner-frontend .
     
     # Stop existing container if running
     docker stop finviz-frontend 2>/dev/null || true

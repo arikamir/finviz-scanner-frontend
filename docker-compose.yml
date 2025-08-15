@@ -4,7 +4,10 @@ services:
   frontend:
     build:
       context: .
-      dockerfile: Dockerfile.frontend.prod
+      dockerfile: Dockerfile
+      target: production
+      args:
+        BUILD_ENV: production
     ports:
       - "80:80"
       - "443:443"

@@ -312,7 +312,7 @@ jobs:
       
       - name: Test Docker Build
         run: |
-          docker build -f Dockerfile.frontend -t finviz-frontend .
+          docker build --target production -t finviz-frontend .
           docker run --rm finviz-frontend
       
       - name: Test Docker Compose

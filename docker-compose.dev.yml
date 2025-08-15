@@ -1,0 +1,25 @@
+version: '3.8'
+
+services:
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: development
+      args:
+        BUILD_ENV: development
+    ports:
+      - "8080:80"
+    environment:
+      - DOMAIN_NAME=${DOMAIN_NAME:-localhost}
+      - BACKEND_HOST=${BACKEND_HOST:-backend}
+      - BACKEND_PORT=${BACKEND_PORT:-8000}
+      - BUILD_ENV=development
+    restart: unless-stopped
+    volumes:
+      # Mount frontend.html for live development
+      - ./frontend.html:/usr/share/nginx/html/index.html:ro
+
+networks:
+  default:
+    name: finviz-network-dev
