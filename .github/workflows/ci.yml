@@ -9,9 +9,7 @@ on:
 
 env:
   REGISTRY: docker.io
-  GHCR_REGISTRY: ghcr.io
   IMAGE_NAME: arikamir/finviz-scanner-frontend
-  GHCR_IMAGE_NAME: ghcr.io/arikamir/finviz-scanner-frontend
 
 jobs:
   # HTML/CSS/JS Validation and Linting
@@ -108,21 +106,12 @@ jobs:
         username: ${{ secrets.DOCKER_USERNAME }}
         password: ${{ secrets.DOCKER_TOKEN }}
         
-    - name: Log in to GitHub Container Registry
-      if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/'))
-      uses: docker/login-action@v3
-      with:
-        registry: ghcr.io
-        username: ${{ github.actor }}
-        password: ${{ secrets.GITHUB_TOKEN }}
-        
     - name: Extract metadata
       id: meta
       uses: docker/metadata-action@v5
       with:
         images: |
           ${{ env.IMAGE_NAME }}
-          ${{ env.GHCR_IMAGE_NAME }}
         tags: |
           type=ref,event=branch
           type=ref,event=pr
@@ -166,23 +155,6 @@ jobs:
         cache-from: type=gha
         cache-to: type=gha,mode=max
         outputs: type=image,name=target,annotation-index.org.opencontainers.image.description=Production-ready nginx frontend for Finviz Scanner
-        
-    - name: Build production image (GitHub Container Registry)
-      uses: docker/build-push-action@v5
-      continue-on-error: true
-      with:
-        context: .
-        file: ./Dockerfile
-        target: production
-        platforms: linux/amd64,linux/arm64
-        push: ${{ github.event_name == 'push' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/')) }}
-        tags: |
-          ${{ env.GHCR_IMAGE_NAME }}:main
-          ${{ env.GHCR_IMAGE_NAME }}:latest
-          ${{ env.GHCR_IMAGE_NAME }}:sha-${{ github.sha }}
-        labels: ${{ steps.meta.outputs.labels }}
-        cache-from: type=gha
-        cache-to: type=gha,mode=max
         
     - name: Test frontend container
       run: |
@@ -303,7 +275,6 @@ jobs:
         echo "✅ **Build Status**: Success" >> $GITHUB_STEP_SUMMARY
         echo "📦 **Docker Images Built**:" >> $GITHUB_STEP_SUMMARY
         echo "- \`arikamir/finviz-scanner-frontend:latest\`" >> $GITHUB_STEP_SUMMARY
-        echo "- \`ghcr.io/arikamir/finviz-scanner-frontend:latest\`" >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY
         echo "🔧 **Features**:" >> $GITHUB_STEP_SUMMARY
         echo "- ✅ Smart SSL certificate handling" >> $GITHUB_STEP_SUMMARY
@@ -316,10 +287,9 @@ jobs:
     - name: Deploy notification
       run: |
         echo "🚀 Deployment completed successfully"
-        echo "✅ Frontend images built and pushed to Docker Hub and GHCR"
+        echo "✅ Frontend images built and pushed to Docker Hub"
         echo "📦 Images available at:"
         echo "  - Docker Hub: arikamir/finviz-scanner-frontend:latest"
-        echo "  - GHCR: ghcr.io/arikamir/finviz-scanner-frontend:latest"
         echo "🔄 Ready for production deployment"
 
   # Cleanup old artifacts
