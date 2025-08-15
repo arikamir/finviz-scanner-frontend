@@ -119,13 +119,21 @@ jobs:
           type=semver,pattern={{major}}.{{minor}}
           type=semver,pattern={{major}}
           type=raw,value=latest,enable={{is_default_branch}}
-          type=sha
+          type=sha,prefix={{branch}}-
         labels: |
           org.opencontainers.image.title=Finviz Scanner Frontend
           org.opencontainers.image.description=Frontend for Finviz ATR Swing Scanner
           org.opencontainers.image.url=https://github.com/arikamir/finviz-scanner-frontend
           org.opencontainers.image.source=https://github.com/arikamir/finviz-scanner-frontend
           org.opencontainers.image.vendor=arikamir
+          org.opencontainers.image.version=${{ steps.package_version.outputs.version }}
+          
+    - name: Get version from package.json
+      id: package_version
+      run: |
+        VERSION=$(node -p "require('./package.json').version")
+        echo "version=$VERSION" >> $GITHUB_OUTPUT
+        echo "📦 Package version: $VERSION"
           
     - name: Build development image
       uses: docker/build-push-action@v5
@@ -148,9 +156,10 @@ jobs:
         platforms: linux/amd64,linux/arm64
         push: ${{ github.event_name == 'push' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/')) }}
         tags: |
-          ${{ env.IMAGE_NAME }}:main
           ${{ env.IMAGE_NAME }}:latest
+          ${{ env.IMAGE_NAME }}:${{ steps.package_version.outputs.version }}
           ${{ env.IMAGE_NAME }}:sha-${{ github.sha }}
+          ${{ startsWith(github.ref, 'refs/tags/') && env.IMAGE_NAME || '' }}:${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || '' }}
         labels: ${{ steps.meta.outputs.labels }}
         cache-from: type=gha
         cache-to: type=gha,mode=max
@@ -290,7 +299,147 @@ jobs:
         echo "✅ Frontend images built and pushed to Docker Hub"
         echo "📦 Images available at:"
         echo "  - Docker Hub: arikamir/finviz-scanner-frontend:latest"
+        echo "  - Version tag: arikamir/finviz-scanner-frontend:${{ steps.package_version.outputs.version }}"
         echo "🔄 Ready for production deployment"
+
+  # Docker Hub Cleanup - Keep only last 10 versions
+  docker_cleanup:
+    runs-on: ubuntu-latest
+    name: Docker Hub Cleanup
+    needs: [docker-build]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set up Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        
+    - name: Install Docker Hub API tools
+      run: |
+        npm install -g axios
+        
+    - name: Clean up old Docker Hub images
+      env:
+        DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
+        DOCKER_TOKEN: ${{ secrets.DOCKER_TOKEN }}
+        REPOSITORY: arikamir/finviz-scanner-frontend
+      run: |
+        cat << 'EOF' > cleanup_docker_hub.js
+        const axios = require('axios');
+        
+        const username = process.env.DOCKER_USERNAME;
+        const token = process.env.DOCKER_TOKEN;
+        const repository = process.env.REPOSITORY;
+        const keepCount = 10; // Keep last 10 versions
+        
+        async function getAuthToken() {
+          const response = await axios.post('https://hub.docker.com/v2/users/login/', {
+            username: username,
+            password: token
+          });
+          return response.data.token;
+        }
+        
+        async function getRepositoryTags(authToken) {
+          const response = await axios.get(`https://hub.docker.com/v2/repositories/${repository}/tags/`, {
+            headers: {
+              'Authorization': `JWT ${authToken}`
+            },
+            params: {
+              page_size: 100,
+              ordering: '-last_updated'
+            }
+          });
+          return response.data.results;
+        }
+        
+        async function deleteTag(authToken, tagName) {
+          try {
+            await axios.delete(`https://hub.docker.com/v2/repositories/${repository}/tags/${tagName}/`, {
+              headers: {
+                'Authorization': `JWT ${authToken}`
+              }
+            });
+            console.log(`✅ Deleted tag: ${tagName}`);
+            return true;
+          } catch (error) {
+            console.log(`❌ Failed to delete tag ${tagName}: ${error.response?.data?.detail || error.message}`);
+            return false;
+          }
+        }
+        
+        async function cleanupOldTags() {
+          try {
+            console.log(`🧹 Starting Docker Hub cleanup for ${repository}`);
+            console.log(`📋 Will keep the latest ${keepCount} semantic version tags`);
+            
+            const authToken = await getAuthToken();
+            const tags = await getRepositoryTags(authToken);
+            
+            // Filter for semantic version tags (exclude latest, sha-, main, etc.)
+            const semverTags = tags.filter(tag => {
+              const name = tag.name;
+              return /^\d+\.\d+\.\d+$/.test(name); // Only semver tags like 1.2.3
+            });
+            
+            console.log(`📦 Found ${semverTags.length} semantic version tags`);
+            
+            if (semverTags.length <= keepCount) {
+              console.log(`✅ No cleanup needed. Found ${semverTags.length} tags, keeping ${keepCount}`);
+              return;
+            }
+            
+            // Sort by semantic version (newest first)
+            semverTags.sort((a, b) => {
+              const aVersion = a.name.split('.').map(Number);
+              const bVersion = b.name.split('.').map(Number);
+              
+              for (let i = 0; i < 3; i++) {
+                if (aVersion[i] !== bVersion[i]) {
+                  return bVersion[i] - aVersion[i]; // Descending order
+                }
+              }
+              return 0;
+            });
+            
+            const toKeep = semverTags.slice(0, keepCount);
+            const toDelete = semverTags.slice(keepCount);
+            
+            console.log(`📋 Tags to keep (${toKeep.length}):`);
+            toKeep.forEach(tag => console.log(`  ✅ ${tag.name}`));
+            
+            console.log(`🗑️  Tags to delete (${toDelete.length}):`);
+            toDelete.forEach(tag => console.log(`  ❌ ${tag.name}`));
+            
+            let deletedCount = 0;
+            for (const tag of toDelete) {
+              if (await deleteTag(authToken, tag.name)) {
+                deletedCount++;
+              }
+              // Small delay to avoid rate limiting
+              await new Promise(resolve => setTimeout(resolve, 1000));
+            }
+            
+            console.log(`\n🎉 Cleanup completed!`);
+            console.log(`📊 Summary:`);
+            console.log(`  - Total semver tags found: ${semverTags.length}`);
+            console.log(`  - Tags kept: ${toKeep.length}`);
+            console.log(`  - Tags deleted: ${deletedCount}/${toDelete.length}`);
+            
+          } catch (error) {
+            console.error(`❌ Cleanup failed: ${error.message}`);
+            process.exit(1);
+          }
+        }
+        
+        cleanupOldTags();
+        EOF
+        
+        node cleanup_docker_hub.js
 
   # Cleanup old artifacts
   cleanup:
