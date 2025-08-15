@@ -1,6 +1,6 @@
 {
   "name": "finviz-scanner-frontend",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "Frontend web interface for Finviz ATR Swing Scanner with Gmail authentication",
   "main": "frontend.html",
   "scripts": {
