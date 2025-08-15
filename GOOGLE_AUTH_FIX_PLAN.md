@@ -33,10 +33,12 @@ The form data is collected and prepared, but when authentication fails, the `sho
 
 ## Proposed Solution
 
-### 1. Store Pending Requests
-- Add a global variable to store pending scan requests
+### 1. Store Pending Requests (Security-Conscious)
+- Add a global variable to store pending scan requests (form data only)
 - Capture form data before authentication check
-- Store it when authentication is required
+- Store it temporarily in memory when authentication is required
+- **Important**: Only store form parameters, NOT authentication tokens
+- Clear immediately after use to minimize memory exposure
 
 ### 2. Auto-Continue After Auth
 - Modify the `handleCredentialResponse()` function to check for pending requests
@@ -107,6 +109,20 @@ function handleCredentialResponse(response) {
 - Update button text to indicate authentication is in progress
 - Clear messaging about what happens after login
 
+5. **Optional Security Improvements** (separate from auth fix):
+```javascript
+// Use sessionStorage instead of localStorage for better security
+sessionStorage.setItem('finviz_token', authToken);
+
+// Add request timeout to clear pending requests
+setTimeout(() => {
+    if (pendingScanRequest) {
+        pendingScanRequest = null;
+        console.log('Pending request cleared due to timeout');
+    }
+}, 300000); // 5 minutes
+```
+
 ## Testing Scenarios
 
 1. **Anonymous user clicks Analyze**:
@@ -133,12 +149,51 @@ function handleCredentialResponse(response) {
 - **Better conversion**: Users less likely to abandon after seeing auth requirement
 - **Consistent behavior**: Authentication becomes transparent to the user workflow
 
-## Risks and Considerations
+## Security Analysis and Risks
+
+### Current Implementation Security Issues (Already Existing)
+⚠️ **HIGH RISK**: The current code has significant security vulnerabilities:
+
+1. **JWT in localStorage**: Google JWT tokens stored in browser localStorage
+   ```javascript
+   localStorage.setItem('finviz_token', authToken); // Vulnerable to XSS
+   ```
+
+2. **Client-side Token Validation**: Token expiry checked only on client
+3. **No CSRF Protection**: No protection against cross-site request forgery
+4. **No Token Refresh**: JWT expires without refresh mechanism
+
+### Proposed Fix Security Impact
+✅ **LOW RISK**: Pending request storage is minimal risk:
+
+1. **Memory-only Storage**: 
+   ```javascript
+   let pendingScanRequest = null; // Temporary, cleared after use
+   ```
+
+2. **Non-sensitive Data**: Only contains form parameters (URLs, numbers, booleans)
+3. **Short-lived**: Cleared immediately after authentication success
+4. **No Auth Data**: Does NOT store tokens, credentials, or user info
+
+### Security Improvements to Consider
+
+1. **Use sessionStorage instead of localStorage**:
+   ```javascript
+   // More secure for tokens
+   sessionStorage.setItem('finviz_token', authToken);
+   ```
+
+2. **Add token refresh mechanism**
+3. **Implement proper server-side token validation**
+4. **Add CSRF tokens**
+5. **Consider secure HTTP-only cookies for token storage**
+
+## Implementation Risks and Considerations
 
 - **Memory**: Storing pending requests (minimal impact for single-user app)
-- **Security**: Ensure token validation still works properly
-- **Edge cases**: Handle multiple pending requests, page reload scenarios
+- **Edge cases**: Handle multiple pending requests, page reload scenarios  
 - **Backward compatibility**: Ensure existing authenticated users see no change
+- **Token Security**: Current localStorage storage is already a security concern
 
 ## Testing Commands
 
