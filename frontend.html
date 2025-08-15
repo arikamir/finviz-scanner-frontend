@@ -616,7 +616,11 @@
     <div id="authOverlay" class="auth-required-overlay" style="display: none;">
         <div class="auth-modal">
             <h3>🔐 Authentication Required</h3>
-            <p>Please sign in with your Gmail account to access the stock scanner and analysis features.</p>
+            <p id="authMessage">Please sign in with your Gmail account to access the stock scanner and analysis features.</p>
+            <div id="pendingRequestIndicator" style="display: none; background: #e6fffa; border: 1px solid #4fd1c7; border-radius: 8px; padding: 10px; margin: 15px 0; color: #234e52;">
+                <strong>📋 Your analysis request is ready!</strong><br>
+                After signing in, we'll automatically run your stock analysis.
+            </div>
             <div id="googleSignInButton"></div>
         </div>
     </div>
@@ -625,6 +629,35 @@
         // Global variables
         let currentUser = null;
         let authToken = null;
+        let pendingScanRequest = null;
+        let pendingRequestTimeout = null;
+        
+        // Security: Clear pending requests after timeout (5 minutes)
+        function clearPendingRequest() {
+            if (pendingRequestTimeout) {
+                clearTimeout(pendingRequestTimeout);
+                pendingRequestTimeout = null;
+            }
+            pendingScanRequest = null;
+            console.log('🔒 Pending request cleared for security');
+        }
+        
+        // Security: Set pending request with timeout
+        function setPendingRequest(scanData) {
+            pendingScanRequest = scanData;
+            
+            // Clear any existing timeout
+            if (pendingRequestTimeout) {
+                clearTimeout(pendingRequestTimeout);
+            }
+            
+            // Set 5-minute timeout for security
+            pendingRequestTimeout = setTimeout(() => {
+                clearPendingRequest();
+            }, 300000); // 5 minutes
+            
+            console.log('🔒 Pending request stored with 5-minute timeout');
+        }
         
         // Google OAuth Configuration
         const GOOGLE_CLIENT_ID = '231341798483-t15q8u15ts5aclnb95v13eohk74ur01t.apps.googleusercontent.com'; // Replace with your actual client ID
@@ -678,12 +711,20 @@
                 
                 authToken = response.credential;
                 
-                // Store in localStorage for persistence
-                localStorage.setItem('finviz_user', JSON.stringify(currentUser));
-                localStorage.setItem('finviz_token', authToken);
+                // Store in sessionStorage for better security (clears on tab close)
+                sessionStorage.setItem('finviz_user', JSON.stringify(currentUser));
+                sessionStorage.setItem('finviz_token', authToken);
                 
                 updateAuthUI();
                 hideAuthOverlay();
+                
+                // Check for pending scan request and execute it
+                if (pendingScanRequest) {
+                    console.log('🚀 Executing pending scan request after authentication');
+                    const scanData = pendingScanRequest;
+                    clearPendingRequest(); // Clear the pending request
+                    performScan(scanData); // Execute the original request
+                }
                 
                 console.log('✅ User signed in:', currentUser.name);
                 
@@ -703,9 +744,12 @@
             currentUser = null;
             authToken = null;
             
-            // Clear localStorage
-            localStorage.removeItem('finviz_user');
-            localStorage.removeItem('finviz_token');
+            // Clear sessionStorage
+            sessionStorage.removeItem('finviz_user');
+            sessionStorage.removeItem('finviz_token');
+            
+            // Clear any pending requests for security
+            clearPendingRequest();
             
             // Sign out from Google
             google.accounts.id.disableAutoSelect();
@@ -718,8 +762,8 @@
         
         // Check for existing authentication
         function checkExistingAuth() {
-            const storedUser = localStorage.getItem('finviz_user');
-            const storedToken = localStorage.getItem('finviz_token');
+            const storedUser = sessionStorage.getItem('finviz_user');
+            const storedToken = sessionStorage.getItem('finviz_token');
             
             if (storedUser && storedToken) {
                 try {
@@ -736,6 +780,7 @@
                         console.log('✅ Restored user session:', currentUser.name);
                     } else {
                         // Token expired
+                        console.log('⚠️ Token expired, signing out');
                         signOut();
                     }
                 } catch (error) {
@@ -767,7 +812,19 @@
         
         // Show authentication overlay
         function showAuthOverlay() {
-            document.getElementById('authOverlay').style.display = 'flex';
+            const overlay = document.getElementById('authOverlay');
+            const pendingIndicator = document.getElementById('pendingRequestIndicator');
+            const authMessage = document.getElementById('authMessage');
+            
+            if (pendingScanRequest) {
+                pendingIndicator.style.display = 'block';
+                authMessage.textContent = 'Please sign in to continue with your stock analysis.';
+            } else {
+                pendingIndicator.style.display = 'none';
+                authMessage.textContent = 'Please sign in with your Gmail account to access the stock scanner and analysis features.';
+            }
+            
+            overlay.style.display = 'flex';
         }
         
         // Hide authentication overlay
@@ -780,15 +837,11 @@
             return currentUser !== null && authToken !== null;
         }
         
-        // Form submission with authentication check
+        // Form submission with authentication check and pending request support
         document.getElementById('scanForm').addEventListener('submit', async function(e) {
             e.preventDefault();
             
-            if (!isAuthenticated()) {
-                showAuthOverlay();
-                return;
-            }
-            
+            // Collect form data first
             const formData = new FormData(e.target);
             const scanData = {
                 screener_url: formData.get('screenerUrl'),
@@ -797,11 +850,21 @@
                 portfolio_cash: parseFloat(formData.get('portfolioCash'))
             };
             
+            if (!isAuthenticated()) {
+                // Store the request and show authentication overlay
+                setPendingRequest(scanData);
+                showAuthOverlay();
+                console.log('🔐 Authentication required, storing scan request...');
+                return;
+            }
+            
             await performScan(scanData);
         });
 
         async function performScan(scanData) {
             if (!isAuthenticated()) {
+                console.log('🔐 Authentication lost during scan, storing request...');
+                setPendingRequest(scanData);
                 showAuthOverlay();
                 return;
             }
@@ -829,6 +892,8 @@
                 
                 if (response.status === 401) {
                     // Token expired or invalid
+                    console.log('🔐 Token expired during scan, re-authenticating...');
+                    setPendingRequest(scanData);
                     signOut();
                     return;
                 }
@@ -842,6 +907,7 @@
                 displayResults(data);
                 
             } catch (error) {
+                console.error('❌ Scan error:', error);
                 displayError(error.message);
             } finally {
                 // Hide loading state
@@ -1063,6 +1129,23 @@
             
             // Check API health
             checkApiHealth();
+        });
+        
+        // Security: Clear pending requests when page unloads
+        window.addEventListener('beforeunload', function() {
+            clearPendingRequest();
+        });
+        
+        // Security: Clear pending requests when page becomes hidden
+        document.addEventListener('visibilitychange', function() {
+            if (document.hidden) {
+                // Don't clear immediately, but start a shorter timeout
+                setTimeout(() => {
+                    if (document.hidden && pendingScanRequest) {
+                        clearPendingRequest();
+                    }
+                }, 60000); // 1 minute when tab is hidden
+            }
         });
     </script>
 </body>
