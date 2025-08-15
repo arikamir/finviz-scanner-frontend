@@ -319,7 +319,7 @@ jobs:
         
     - name: Install Docker Hub API tools
       run: |
-        npm install -g axios
+        npm install axios
         
     - name: Clean up old Docker Hub images
       env:
