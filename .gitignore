@@ -127,6 +127,11 @@ venv.bak/
 dist/
 build/
 
+# Docker backup directories (auto-generated during cleanup)
+docker-backup-*/
+cleanup-dockerfiles.sh
+DOCKER_CLEANUP_SUMMARY.md
+
 # Backup directory - but track the structure
 backup/old_structure/
 # Keep backup directory structure but ignore contents

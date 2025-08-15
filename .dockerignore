@@ -1,0 +1,55 @@
+# .dockerignore for Finviz Scanner Frontend
+
+# Git
+.git
+.gitignore
+
+# Documentation
+README*.md
+*.md
+docs/
+
+# Development files
+.vscode/
+.idea/
+*.log
+
+# Backup files
+backup/
+*.bak
+*.backup
+
+# Temporary files
+.tmp/
+tmp/
+*.tmp
+
+# Node modules (if any)
+node_modules/
+npm-debug.log*
+
+# Environment files (keep .env.example)
+.env
+.env.local
+.env.*.local
+
+# Build artifacts
+dist/
+build/
+
+# Testing
+coverage/
+.nyc_output/
+
+# Operating system files
+.DS_Store
+Thumbs.db
+
+# Old Dockerfiles (we're cleaning these up)
+Dockerfile.frontend.*
+
+# Scripts that aren't needed in container
+scripts/version.js
+
+# CI files that aren't needed in container
+.github/
