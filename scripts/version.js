@@ -90,7 +90,7 @@ class VersionManager {
             version = this.getCurrentVersion();
         }
 
-        const tagName = `frontend-v${version}`;
+        const tagName = `v${version}`;
 
         try {
             // Check if tag already exists
@@ -98,18 +98,84 @@ class VersionManager {
             
             if (existingTags.includes(tagName)) {
                 console.log(`⚠️  Tag ${tagName} already exists`);
-                return;
+                return false;
+            }
+
+            // Ensure we're on the main branch for releases
+            const currentBranch = execSync('git branch --show-current', { encoding: 'utf8' }).trim();
+            if (currentBranch !== 'main') {
+                console.log(`⚠️  Not on main branch (currently on ${currentBranch}). Consider switching to main for releases.`);
             }
 
             // Create annotated tag
-            execSync(`git tag -a ${tagName} -m "Frontend release version ${version}"`, { stdio: 'inherit' });
+            execSync(`git tag -a ${tagName} -m "Release version ${version}
+
+This release includes:
+- Frontend version ${version}
+- Docker images: arikamir/finviz-scanner-frontend:${version}
+- Multi-architecture support (AMD64/ARM64)
+- Production-ready nginx configuration"`, { stdio: 'inherit' });
             
             console.log(`✅ Created git tag ${tagName}`);
             console.log(`💡 Push with: git push origin ${tagName}`);
+            return true;
 
         } catch (error) {
             console.error(`❌ Failed to create git tag: ${error.message}`);
+            return false;
         }
+    }
+
+    pushTag(version = null) {
+        if (version === null) {
+            version = this.getCurrentVersion();
+        }
+
+        const tagName = `v${version}`;
+
+        try {
+            execSync(`git push origin ${tagName}`, { stdio: 'inherit' });
+            console.log(`✅ Pushed tag ${tagName} to origin`);
+            return true;
+        } catch (error) {
+            console.error(`❌ Failed to push tag: ${error.message}`);
+            return false;
+        }
+    }
+
+    createRelease(part) {
+        const oldVersion = this.getCurrentVersion();
+        
+        console.log(`🚀 Creating ${part} release...`);
+        console.log(`Current version: ${oldVersion}`);
+        
+        // Bump version
+        const newVersion = this.bumpVersion(part);
+        console.log(`New version: ${newVersion}`);
+        
+        // Commit version change
+        try {
+            execSync('git add package.json', { stdio: 'inherit' });
+            execSync(`git commit -m "chore: bump version to ${newVersion}"`, { stdio: 'inherit' });
+            console.log(`✅ Committed version bump`);
+        } catch (error) {
+            console.error(`❌ Failed to commit version change: ${error.message}`);
+            return false;
+        }
+        
+        // Create and push tag
+        if (this.createGitTag(newVersion)) {
+            console.log(`🏷️  Tag created successfully`);
+            console.log(`📦 Docker images will be built with tag: ${newVersion}`);
+            console.log(`🌐 This will trigger CI/CD to publish to Docker Hub`);
+            console.log(`\n💡 Next steps:`);
+            console.log(`   1. git push origin main`);
+            console.log(`   2. git push origin v${newVersion}`);
+            console.log(`   3. Monitor CI/CD pipeline for Docker Hub publish`);
+            return true;
+        }
+        
+        return false;
     }
 }
 
@@ -124,6 +190,7 @@ Usage:
     node scripts/version.js bump <major|minor|patch>   # Bump version
     node scripts/version.js set <version>              # Set specific version
     node scripts/version.js tag                        # Create git tag for current version
+    node scripts/version.js release <major|minor|patch> # Full release workflow (bump + commit + tag)
         `);
         return;
     }
@@ -159,6 +226,14 @@ Usage:
 
             case 'tag':
                 versionManager.createGitTag();
+                break;
+
+            case 'release':
+                const releasePart = args[1];
+                if (!releasePart || !['major', 'minor', 'patch'].includes(releasePart)) {
+                    throw new Error('Release command requires part: major, minor, or patch');
+                }
+                versionManager.createRelease(releasePart);
                 break;
 
             default:
